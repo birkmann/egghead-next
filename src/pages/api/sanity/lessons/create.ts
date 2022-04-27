@@ -14,6 +14,11 @@ type LessonData = {
   }
 }
 
+type SanityReference = {
+  _type: 'reference'
+  _ref: string
+}
+
 type SanityReferenceArray = Array<{
   _key: string
   _type: 'reference'
@@ -31,10 +36,13 @@ type SanityLesson = {
   _type: 'lesson'
   _id: string
   title: string
-  resource: {
-    _type: string
-    _ref: string
-  }
+  resource: SanityReference
+}
+
+type SanitySoftwareLibrary = {
+  _type: 'versioned-software-library'
+  _key: string
+  library: SanityReference
 }
 
 type SanityCourse = {
@@ -42,6 +50,7 @@ type SanityCourse = {
   title: string
   collaborators: SanityReferenceArray
   lessons: SanityReferenceArray
+  softwareLibraries: SanitySoftwareLibrary[]
 }
 
 const sanityClient = client({
@@ -69,13 +78,14 @@ async function formatSanityMutationForLessons(
   let sanityLessons: SanityLesson[] = []
   let sanityResources: SanityVideoResource[] = []
 
-  const {title, collaboratorId} = course
+  const {title, collaboratorId, topicIds} = course
 
   let sanityCourse: SanityCourse = {
     _type: 'course',
     title,
     lessons: [],
     collaborators: [],
+    softwareLibraries: [],
   }
 
   const collaboratorKey = await nanoid()
@@ -90,6 +100,23 @@ async function formatSanityMutationForLessons(
     ]
   }
 
+  if (topicIds.length !== 0) {
+    await Promise.all(
+      topicIds.map(async (topicId) => {
+        const topicKey = await nanoid()
+        sanityCourse.softwareLibraries.push({
+          _type: 'versioned-software-library',
+          _key: topicKey,
+          library: {
+            _type: 'reference',
+            _ref: topicId,
+          },
+        })
+      }),
+    )
+  }
+
+  // TODO: Add softwareLibrary to lessons
   await Promise.all(
     lessons.map(async (lesson) => {
       const videoId = await sanityIdForDocumentType('videoResource')
